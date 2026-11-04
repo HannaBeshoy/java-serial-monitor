@@ -1,0 +1,9 @@
+target/
+*.class
+*.csv
+!docs/*.csv
+.idea/
+*.iml
+out/
+.vscode/
+.DS_Store

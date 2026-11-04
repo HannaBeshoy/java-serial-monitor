@@ -1,0 +1,28 @@
+reading from simulation (16 lines), alarms [T>23.6]
+#0      T 23.9 °C    D 50.8 cm    L 59.6 %
+  ALARM T>23.6 : Temperature (LM35) = 23.9 °C
+#1      T 23.9 °C    D 49.7 cm    L 60.2 %
+#2      T 23.5 °C    D 50.7 cm    L 59.8 %
+#3      T 23.0 °C    D 51.7 cm    L 59.2 %
+  clear T>23.6 : Temperature (LM35) = 23.0 °C
+#4      T 23.5 °C    D 54.0 cm    L 62.5 %
+#5      T 23.5 °C    D 52.4 cm    L 60.5 %
+#6      T 23.9 °C    D 53.2 cm    L 59.9 %
+  ALARM T>23.6 : Temperature (LM35) = 23.9 °C
+#7      T 23.5 °C    D invalid    L 59.4 %
+#8      T 23.5 °C    D 55.2 cm    L 60.4 %
+  bad line (CHECKSUM): checksum 58 but computed 21
+  lost 1 frame(s) after #8
+#10     T 23.5 °C    D 55.0 cm    L 60.0 %
+#11     T 23.5 °C    D 56.1 cm    L 59.4 %
+#12     T 23.5 °C    D 58.0 cm    L 62.1 %
+#13     T 23.9 °C    D 57.8 cm    L 60.7 %
+#14     T 23.0 °C    D 59.2 cm    L 60.3 %
+  clear T>23.6 : Temperature (LM35) = 23.0 °C
+#15     T 23.0 °C    D 59.0 cm    L 60.3 %
+
+summary: lines 16, frames 15, bad 1 (checksum 1), lost 1, dropped 0, unknown keys 0, quality 93.8 %
+  Temperature (LM35)   min   22.97  mean   23.49  max   23.95  sd  0.33 °C  (last 15 of 15)
+  Distance (HC-SR04)   min   49.67  mean   54.47  max   59.20  sd  3.11 cm  (last 14 of 14)
+  Light (LDR)          min   59.24  mean   60.30  max   62.46  sd  0.88 %  (last 15 of 15)
+log written to run.csv
