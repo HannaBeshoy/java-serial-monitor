@@ -9,7 +9,7 @@ A desktop program that reads a sensor node (Arduino with an LM35 temperature sen
 - [x] Line protocol with XOR checksum, parser and formatter ([protocol](docs/PROTOCOL.md))
 - [x] Reader and dispatcher threads with a bounded queue, never blocking a live port
 - [x] Statistics, alarms, CSV log, console output and a Swing window with a trend plot
-- [x] **41 JUnit tests pass**, all with simulated or recorded data
+- [x] **46 JUnit tests pass**, all with simulated or recorded data
 - [x] Arduino sketch written; its output is checked by replaying it through the parser
 - [ ] Tested with the real Arduino and sensors (planned for the lab day, December 2026)
 
@@ -110,6 +110,8 @@ mvn test
 | Event handling | listener pattern in `Monitor`, Swing `ActionListener`, `Timer` |
 | Concurrency | reader and dispatcher threads, `BlockingQueue`, atomics, `CountDownLatch`, `synchronized` stats, the Swing event thread |
 | Lambdas and streams | statistics in `RollingStats`, listener calls, the trend plot |
+| `Comparable`, `Comparator`, sorting by several criteria | `AlarmHistory.Entry`: most severe alarm first, then earliest, then by key; `BY_TIME` as a second order; the end-of-run alarm summary |
+| `equals` and `hashCode` | `Sensor` (class, key, unit, range) and `Lm35TemperatureSensor` (adds its reference voltage) |
 | Files | CSV output, replay input |
 
 The [project guide](docs/PROJECT_GUIDE.md) explains each design choice.

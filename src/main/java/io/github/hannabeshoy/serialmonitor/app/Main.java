@@ -8,6 +8,7 @@ import io.github.hannabeshoy.serialmonitor.source.DataSource;
 import io.github.hannabeshoy.serialmonitor.source.ReplaySource;
 import io.github.hannabeshoy.serialmonitor.source.SerialPortSource;
 import io.github.hannabeshoy.serialmonitor.source.SimulatedSource;
+import io.github.hannabeshoy.serialmonitor.stats.AlarmHistory;
 import io.github.hannabeshoy.serialmonitor.stats.RollingStats;
 import io.github.hannabeshoy.serialmonitor.ui.MonitorWindow;
 
@@ -63,6 +64,8 @@ public final class Main {
 
         Monitor monitor = new Monitor(source, SensorRegistry.standard(), o.alarms());
         monitor.addListener(new ConsolePrinter(out, o.quiet() || o.gui()));
+        AlarmHistory history = new AlarmHistory();
+        monitor.addListener(history);
         CsvLogger csv = null;
         try {
             if (o.log() != null) {
@@ -105,6 +108,10 @@ public final class Main {
             }
         }
         printSummary(monitor, out, o);
+        if (history.size() > 0) {
+            out.println("alarms, most severe first:");
+            out.print(history.report());
+        }
         return monitor.snapshot().error() == null ? 0 : 1;
     }
 

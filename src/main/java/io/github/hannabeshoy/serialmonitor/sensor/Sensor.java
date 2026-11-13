@@ -51,6 +51,26 @@ public abstract class Sensor {
     public double min()  { return min; }
     public double max()  { return max; }
 
+    /**
+     * Two sensors are equal when they are of the same class and have the same key, unit and
+     * range. The readable name is left out on purpose: renaming a sensor does not make it a
+     * different sensor.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Sensor other = (Sensor) o;
+        return key.equals(other.key) && unit.equals(other.unit)
+                && Double.compare(min, other.min) == 0 && Double.compare(max, other.max) == 0;
+    }
+
+    /** Equal sensors must have equal hash codes, so the same fields are used as in equals. */
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(getClass(), key, unit, min, max);
+    }
+
     @Override
     public String toString() {
         return name + " [" + key + ", " + unit + "]";

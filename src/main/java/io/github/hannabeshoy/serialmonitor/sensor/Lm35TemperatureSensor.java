@@ -25,4 +25,15 @@ public class Lm35TemperatureSensor extends Sensor {
     public double convert(long raw) {
         return raw * vref / 1023.0 * 100.0;
     }
+
+    /** A subclass with its own field must include it: two LM35s on different references convert differently. */
+    @Override
+    public boolean equals(Object o) {
+        return super.equals(o) && Double.compare(vref, ((Lm35TemperatureSensor) o).vref) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * super.hashCode() + Double.hashCode(vref);
+    }
 }
