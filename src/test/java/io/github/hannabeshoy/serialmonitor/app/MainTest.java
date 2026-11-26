@@ -54,7 +54,8 @@ public class MainTest {
     @Test
     public void rejectsBadInput() {
         String[][] bad = {{"--port"}, {"--sim", "--port", "COM3"}, {"--baud", "0"}, {"--count", "x"}, {"--bogus"},
-                {"--alarm", "T=3"}, {"--period", "-5"}, {"--count", "-7"}};
+                {"--alarm", "T=3"}, {"--period", "-5"}, {"--count", "-7"}, {"--sort", "size"}, {"--label", " "},
+                {"--label", "x".repeat(101)}, {"--save"}, {"--sim", "--show", "a.ser"}};
         for (String[] args : bad)
             assertThrows(String.join(" ", args), IllegalArgumentException.class, () -> Options.parse(args));
     }
@@ -81,5 +82,49 @@ public class MainTest {
         int code = Main.run(Options.parse("--replay", tmp.getRoot().toPath().resolve("nope.txt").toString()), new PrintStream(buf));
         assertEquals(1, code);
         assertTrue(buf.toString().startsWith("error:"));
+    }
+
+    @Test
+    public void parsesTheSessionOptions() {
+        Options o = Options.parse("--save", "run.ser", "--export", "run.txt", "--label", "bench", "--sort", "value");
+        assertEquals(Options.Mode.SIM, o.mode());
+        assertEquals(Path.of("run.ser"), o.save());
+        assertEquals(Path.of("run.txt"), o.export());
+        assertEquals("bench", o.label());
+        assertEquals(Options.Sort.VALUE, o.sort());
+        assertEquals(Options.Sort.TIME, Options.parse().sort());
+        Options show = Options.parse("--show", "run.ser", "--sort", "name");
+        assertEquals(Options.Mode.SHOW, show.mode());
+        assertEquals(Path.of("run.ser"), show.show());
+        assertEquals(Options.Sort.NAME, show.sort());
+    }
+
+    @Test
+    public void savedSessionCanBeShownAndExportedLater() throws Exception {
+        Path ser = tmp.getRoot().toPath().resolve("run.ser");
+        Path txt = tmp.getRoot().toPath().resolve("run.txt");
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        int code = Main.run(Options.parse("--sim", "--count", "20", "--seed", "4", "--quiet",
+                "--save", ser.toString(), "--export", txt.toString(), "--label", "bench"), new PrintStream(buf, true, StandardCharsets.UTF_8));
+        String out = buf.toString(StandardCharsets.UTF_8);
+        assertEquals(out, 0, code);
+        assertTrue(out, out.contains("session saved to " + ser + " (60 readings)"));   // 20 frames x 3 sensors
+        List<String> exported = Files.readAllLines(txt, StandardCharsets.UTF_8);
+        assertEquals("session: bench", exported.get(0));
+        assertEquals("source: simulation (20 lines)", exported.get(1));
+        assertTrue(exported.get(3), exported.get(3).startsWith("summary: lines 20, frames 20"));
+
+        ByteArrayOutputStream shown = new ByteArrayOutputStream();
+        assertEquals(0, Main.run(Options.parse("--show", ser.toString()), new PrintStream(shown, true, StandardCharsets.UTF_8)));
+        List<String> lines = shown.toString(StandardCharsets.UTF_8).lines().toList();
+        assertEquals(exported, lines);                               // the loaded session prints the same report
+    }
+
+    @Test
+    public void missingSessionFileIsAnErrorNotACrash() {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        int code = Main.run(Options.parse("--show", tmp.getRoot().toPath().resolve("nope.ser").toString()), new PrintStream(buf));
+        assertEquals(1, code);
+        assertTrue(buf.toString().startsWith("error: cannot load"));
     }
 }
