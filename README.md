@@ -4,12 +4,13 @@
 
 **Programming Languages 2 course project** · University of Debrecen, Faculty of Informatics · Java 21 · Maven · Swing · Arduino
 
-A desktop program that reads a sensor node (Arduino with an LM35 temperature sensor, an HC-SR04 ultrasonic distance sensor and an LDR) over a serial port. It checks every line with a checksum, detects lost frames from the sequence numbers, converts the raw values into °C, cm and %, keeps rolling statistics, raises alarms with hysteresis, writes a CSV log and shows a live window. A simulated node with fault injection lets everything run and be tested without hardware.
+A desktop program that reads a sensor node (Arduino with an LM35 temperature sensor, an HC-SR04 ultrasonic distance sensor and an LDR) over a serial port. It checks every line with a checksum, detects lost frames from the sequence numbers, converts the raw values into °C, cm and %, keeps rolling statistics, raises alarms with hysteresis, writes a CSV log, saves whole sessions to load and sort later, and shows a live window. A simulated node with fault injection lets everything run and be tested without hardware.
 
 - [x] Line protocol with XOR checksum, parser and formatter ([protocol](docs/PROTOCOL.md))
 - [x] Reader and dispatcher threads with a bounded queue, never blocking a live port
 - [x] Statistics, alarms, CSV log, console output and a Swing window with a trend plot
-- [x] **46 JUnit tests pass**, all with simulated or recorded data
+- [x] Sessions saved and loaded with serialization, sorted three ways and exported as a text report
+- [x] **61 JUnit tests pass**, all with simulated or recorded data
 - [x] Arduino sketch written; its output is checked by replaying it through the parser
 - [ ] Tested with the real Arduino and sensors (planned for the lab day, December 2026)
 
@@ -48,6 +49,8 @@ java -jar target/java-serial-monitor-1.0.0.jar --sim --gui --faults          # l
 java -jar target/java-serial-monitor-1.0.0.jar --replay docs/sample-lines.txt
 java -jar target/java-serial-monitor-1.0.0.jar --list-ports
 java -jar target/java-serial-monitor-1.0.0.jar --port COM3 --gui --log run.csv   # the real node
+java -jar target/java-serial-monitor-1.0.0.jar --sim --save run.ser --export run.txt --label "bench test"
+java -jar target/java-serial-monitor-1.0.0.jar --show run.ser --sort value         # highest value per sensor first
 ```
 
 Part of a run on simulated data with faults ([full output](docs/sample-output.txt)):
@@ -68,7 +71,7 @@ summary: lines 16, frames 15, bad 1 (checksum 1), lost 1, dropped 0, unknown key
 
 `D invalid` is an ultrasonic timeout (no echo). The damaged frame #9 fails its checksum, so it is rejected and also shows up as lost. Temperatures move in steps of 0.49 °C because that is one step of a 10-bit ADC with a 5 V reference on an LM35 (5 V / 1023 / 10 mV per °C).
 
-All options: `--help`. The CSV log has one row per reading, bad line and alarm ([sample](docs/sample-log.csv)).
+All options: `--help`. The CSV log has one row per reading, bad line and alarm ([sample](docs/sample-log.csv)). `--save` keeps the whole session (label, source, start time, every reading and the summary) in a file that `--show` loads again; `--export` writes the same report as text. `--sort time|value|name` chooses the order of the readings. A session is only kept in memory when `--save` or `--export` is given, so an endless `--gui` run without them does not grow.
 
 ## The sensor node
 
@@ -89,12 +92,13 @@ mvn test
 | Test class | What it checks |
 | --- | --- |
 | `FrameCodecTest` | checksum values, round trip, CR/LF and spaces, every syntax, checksum and field error |
-| `SensorTest` | each conversion against hand calculations, ranges, timeouts, the registry |
+| `SensorTest` | each conversion against hand calculations, ranges, timeouts, the registry and its order by name |
 | `StatsTest` | rolling window, mean and standard deviation, alarm rules, hysteresis |
 | `SimulatedSourceTest` | same seed gives the same lines, fault rates, close, replay |
 | `MonitorTest` | every line counted once, lost-frame detection, node restart, alarms end to end, unknown keys, fast stop, dropping under load without false "lost" counts, failing listeners, I/O errors |
 | `CsvLoggerTest` | RFC 4180 escaping, one row per event, folder creation |
-| `MainTest` | every option, bad input, a full console run, a missing file |
+| `SessionTest` | the value comparator's sign rule, the three sort orders, the label check, the exact text export, save then load gives an equal new session, the transient source, rejected files |
+| `MainTest` | every option, bad input, a full console run, a missing file, save then show gives the same report |
 
 ## What the course topics became
 
@@ -112,7 +116,9 @@ mvn test
 | Lambdas and streams | statistics in `RollingStats`, listener calls, the trend plot |
 | `Comparable`, `Comparator`, sorting by several criteria | `AlarmHistory.Entry`: most severe alarm first, then earliest, then by key; `BY_TIME` as a second order; the end-of-run alarm summary |
 | `equals` and `hashCode` | `Sensor` (class, key, unit, range) and `Lm35TemperatureSensor` (adds its reference voltage) |
-| Files | CSV output, replay input |
+| Files | CSV output, replay input, session text export and save/load |
+| **Lab 6** (Lab 6 slides): access levels, a validating setter, a custom checked exception, `super(...)` and `this(...)`, static methods vs instance state, `Comparable` | `private` fields and a `protected` constructor in `Sensor`; `Session.setLabel` (the constructor calls it, so the check is in one place); `FrameException`; `Lm35TemperatureSensor`, `UltrasonicDistanceSensor` and `LightSensor` call `super(...)`, `Session(String, DataSource)` calls `this(...)`; static `Session.load` and `SensorRegistry.standard()` make objects, instance `Session.save` works on one; `AlarmHistory.Entry implements Comparable` |
+| **Lab 7** (Lab 7 slides): the three `Comparator` forms and a lambda, a custom interface, `PrintWriter`, serialization | `ReadingComparatorByValue` (separate class), `Session.ArrivalOrder` (inner class), the anonymous comparator in `Session.sortBySensorName`, lambdas in `Session.sensorNames` and `SensorRegistry.sortedByName`; `Session implements SortableReadings`; `Session.exportText` (`PrintWriter` in try-with-resources); `Session.save` and `Session.load` (`ObjectOutputStream`, `ObjectInputStream`), `Session`, `Reading` and `MonitorStats` are `Serializable`, `serialVersionUID`, the `transient` live source |
 
 The [project guide](docs/PROJECT_GUIDE.md) explains each design choice.
 
@@ -124,8 +130,9 @@ src/main/java/io/github/hannabeshoy/serialmonitor/
   sensor/     Sensor and its subclasses, Reading, SensorRegistry
   source/     DataSource, SerialPortSource, SimulatedSource, ReplaySource
   core/       Monitor, MonitorListener, MonitorStats
-  stats/      RollingStats, AlarmRule, AlarmTracker
+  stats/      RollingStats, AlarmRule, AlarmTracker, AlarmHistory
   log/        CsvLogger
+  session/    Session, SortableReadings, ReadingComparatorByValue
   ui/         MonitorWindow, TrendPanel
   app/        Main, Options, ConsolePrinter
 src/test/java/...   JUnit 4 tests
