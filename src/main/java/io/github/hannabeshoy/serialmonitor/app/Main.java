@@ -4,6 +4,7 @@ import io.github.hannabeshoy.serialmonitor.core.Monitor;
 import io.github.hannabeshoy.serialmonitor.core.MonitorStats;
 import io.github.hannabeshoy.serialmonitor.log.CsvLogger;
 import io.github.hannabeshoy.serialmonitor.sensor.SensorRegistry;
+import io.github.hannabeshoy.serialmonitor.session.Session;
 import io.github.hannabeshoy.serialmonitor.source.DataSource;
 import io.github.hannabeshoy.serialmonitor.source.ReplaySource;
 import io.github.hannabeshoy.serialmonitor.source.SerialPortSource;
@@ -14,7 +15,11 @@ import io.github.hannabeshoy.serialmonitor.ui.MonitorWindow;
 
 import javax.swing.SwingUtilities;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +56,9 @@ public final class Main {
                 ports.forEach(out::println);
                 return 0;
             }
+            case SHOW -> {
+                return show(o, out);
+            }
             default -> { }
         }
 
@@ -66,6 +74,12 @@ public final class Main {
         monitor.addListener(new ConsolePrinter(out, o.quiet() || o.gui()));
         AlarmHistory history = new AlarmHistory();
         monitor.addListener(history);
+        Session session = null;
+        if (o.save() != null || o.export() != null) {      // only kept when asked for: an endless run would fill the memory
+            String label = o.label() != null ? o.label() : "run " + Instant.now().truncatedTo(ChronoUnit.SECONDS);
+            session = new Session(label, source);
+            monitor.addListener(session);
+        }
         CsvLogger csv = null;
         try {
             if (o.log() != null) {
@@ -112,7 +126,60 @@ public final class Main {
             out.println("alarms, most severe first:");
             out.print(history.report());
         }
+        if (session != null && !writeSession(session, o, out)) return 1;
         return monitor.snapshot().error() == null ? 0 : 1;
+    }
+
+    /** Saves and exports the recorded session as the options ask; false if a file could not be written. */
+    private static boolean writeSession(Session session, Options o, PrintStream out) {
+        sort(session, o.sort());
+        try {
+            if (o.export() != null) {
+                session.exportText(o.export());
+                out.println("session exported to " + o.export());
+            }
+            if (o.save() != null) {
+                session.save(o.save());
+                out.println("session saved to " + o.save() + " (" + session.readings().size() + " readings)");
+            }
+            return true;
+        } catch (IOException e) {
+            out.println("error: cannot write the session: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** --show: loads a saved session and prints its report. */
+    private static int show(Options o, PrintStream out) {
+        Session session;
+        try {
+            session = Session.load(o.show());
+        } catch (IOException e) {
+            out.println("error: cannot load " + o.show() + ": " + e.getMessage());
+            return 1;
+        }
+        sort(session, o.sort());
+        PrintWriter w = new PrintWriter(new OutputStreamWriter(out, out.charset()));
+        session.writeTo(w);
+        w.flush();                                      // not closed: that would close the caller's stream
+        if (o.export() != null) {
+            try {
+                session.exportText(o.export());
+                out.println("session exported to " + o.export());
+            } catch (IOException e) {
+                out.println("error: cannot write " + o.export() + ": " + e.getMessage());
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    private static void sort(Session session, Options.Sort order) {
+        switch (order) {
+            case TIME -> session.sortByTime();
+            case VALUE -> session.sortByValue();
+            case NAME -> session.sortBySensorName();
+        }
     }
 
     private static DataSource open(Options o) throws IOException {
@@ -121,7 +188,7 @@ public final class Main {
             case REPLAY -> ReplaySource.of(o.replay());
             case SIM -> new SimulatedSource(o.seed(), o.count(), o.periodMs(),
                     o.faults() ? SimulatedSource.Faults.TYPICAL : SimulatedSource.Faults.NONE);
-            case LIST_PORTS, HELP -> throw new IllegalStateException("not a data source: " + o.mode());
+            case SHOW, LIST_PORTS, HELP -> throw new IllegalStateException("not a data source: " + o.mode());
         };
     }
 

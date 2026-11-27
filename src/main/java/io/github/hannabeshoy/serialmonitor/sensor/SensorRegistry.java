@@ -1,8 +1,11 @@
 package io.github.hannabeshoy.serialmonitor.sensor;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,5 +33,12 @@ public final class SensorRegistry {
 
     public Collection<Sensor> all() {
         return Collections.unmodifiableCollection(byKey.values());
+    }
+
+    /** The sensors sorted by readable name, ignoring case; for equal names by key. */
+    public List<Sensor> sortedByName() {
+        List<Sensor> list = new ArrayList<>(byKey.values());
+        list.sort(Comparator.comparing(Sensor::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Sensor::key));
+        return list;
     }
 }

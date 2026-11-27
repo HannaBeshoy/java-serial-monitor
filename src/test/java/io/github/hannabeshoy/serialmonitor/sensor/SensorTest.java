@@ -3,6 +3,7 @@ package io.github.hannabeshoy.serialmonitor.sensor;
 import org.junit.Test;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -66,5 +67,15 @@ public class SensorTest {
         double sum = 0;
         for (Sensor s : SensorRegistry.standard().all()) sum += s.convert(100);   // dynamic binding
         assertEquals(100 * 5.0 / 1023 * 100 + 100 / UltrasonicDistanceSensor.US_PER_CM + 100 * 100.0 / 1023, sum, 1e-9);
+    }
+
+    @Test
+    public void registrySortsSensorsByNameIgnoringCase() {
+        SensorRegistry reg = SensorRegistry.standard().add(new LightSensor("l2") {
+            @Override public String name() { return "ambient light"; }
+        });
+        List<String> names = reg.sortedByName().stream().map(Sensor::name).toList();
+        assertEquals(List.of("ambient light", "Distance (HC-SR04)", "Light (LDR)", "Temperature (LM35)"), names);
+        assertEquals(List.of("T", "D", "L", "l2"), reg.all().stream().map(Sensor::key).toList());   // registration order kept
     }
 }

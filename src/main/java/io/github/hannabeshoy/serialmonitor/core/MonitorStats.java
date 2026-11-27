@@ -1,5 +1,7 @@
 package io.github.hannabeshoy.serialmonitor.core;
 
+import java.io.Serializable;
+
 /**
  * Counters of one monitoring session, as an immutable snapshot.
  *
@@ -11,8 +13,11 @@ package io.github.hannabeshoy.serialmonitor.core;
  * @param dropped  frames thrown away because the queue was full (the PC was too slow)
  * @param unknown  readings whose key has no registered sensor
  * @param error    the I/O error that ended the session, or null
+ *
+ * <p>Serializable, so a saved {@code Session} keeps its final counters.
  */
-public record MonitorStats(long lines, long frames, long bad, long checksum, long lost, long dropped, long unknown, String error) {
+public record MonitorStats(long lines, long frames, long bad, long checksum, long lost, long dropped, long unknown, String error)
+        implements Serializable {
 
     /** Share of lines that were valid frames, 0..1. */
     public double quality() {

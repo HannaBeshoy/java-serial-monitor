@@ -22,7 +22,7 @@ The monitor only knows `Sensor`. Which `convert` runs is decided at run time by 
 
 ## 3. Sources behind an interface
 
-`DataSource` has three methods (`readLine`, `describe`, `close`) and one **default method**, `isLive()`. `SerialPortSource`, `SimulatedSource` and `ReplaySource` implement it. The monitor and all tests are written against the interface, which is what makes 41 tests possible without an Arduino.
+`DataSource` has three methods (`readLine`, `describe`, `close`) and one **default method**, `isLive()`. `SerialPortSource`, `SimulatedSource` and `ReplaySource` implement it. The monitor and all tests are written against the interface, which is what makes all 61 tests possible without an Arduino.
 
 `SimulatedSource` produces exactly what the node would send, through the same `FrameCodec.format`, and can inject the four faults a real cable shows: a changed character, a garbage line, a missing frame and a sensor timeout. A fixed **seed** makes every run repeatable, so tests can expect exact results.
 
@@ -60,6 +60,14 @@ Shared counters are `AtomicLong` (lock-free, safe from both threads). `RollingSt
 ## 8. Files
 
 `CsvLogger` writes through a `BufferedWriter` and quotes cells by RFC 4180, so a bad line containing commas cannot break the columns. It is `AutoCloseable` and used in try-with-resources in the tests. Listener methods cannot throw checked exceptions, so an `IOException` is wrapped in `UncheckedIOException`.
+
+### Sessions: sorting, text export and serialization
+
+`Session` records a run as a `MonitorListener` (only when `--save` or `--export` is given) and implements the small interface `SortableReadings`. Its three sort methods use the three ways of writing a `Comparator`: the separate class `ReadingComparatorByValue` (reusable and tested on its own; highest value first, invalid readings last, `Double.compare` instead of subtraction), the private inner class `ArrivalOrder`, and an anonymous class for the order by sensor name. Sorting by value groups by sensor key first, so °C, cm and % are never compared with each other. `List.sort` is stable and sorts in place.
+
+`exportText` writes a report with a `PrintWriter` in try-with-resources. A `PrintWriter` never throws, so `checkError()` turns a failed write into an `IOException`. Numbers use `Locale.ROOT`, so the file has a decimal point on every computer.
+
+`save` and `load` use `ObjectOutputStream` and `ObjectInputStream`. Serialization writes the whole object graph, so `Reading` and `MonitorStats` are `Serializable` too. The live `DataSource` is `transient`: a serial port is an operating-system handle that cannot be written to a file, so only its description is kept. `serialVersionUID` is fixed, so a file from an incompatible version is rejected instead of read wrongly. `load` is static (it makes the object), `save` is an instance method (it writes this object), and the loaded session equals the saved one but is a new object. Because reading a file builds objects, `load` sets an `ObjectInputFilter` that accepts only the session's own classes.
 
 ## 9. The window
 
